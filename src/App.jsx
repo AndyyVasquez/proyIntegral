@@ -1,94 +1,116 @@
-import { useEffect, useState } from 'react';
-import { db } from './firebaseConfig';
+// src/App.jsx
+import { useState, useEffect } from "react";
+import { db } from "./firebaseConfig";
 import {
   collection,
   getDocs,
-  doc,
+  addDoc,
   updateDoc,
   deleteDoc,
-  addDoc
+  doc,
 } from "firebase/firestore";
+import { Bar } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+} from "chart.js";
+
+ChartJS.register(BarElement, CategoryScale, LinearScale);
 
 function App() {
-  const [name, setName] = useState('');
-  const [age, setAge] = useState('');
-  const [users, setUsers] = useState([]);
-  const [editingID, setEditingID] = useState(null);
+  const [usuarios, setUsuarios] = useState([]);
+  const [nombre, setNombre] = useState("");
+  const [edad, setEdad] = useState("");
+  const [editId, setEditId] = useState(null);
 
-  
-  const fetchUsers = async () => {
-    const querySnapshot = await getDocs(collection(db, "users"));
-    setUsers(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-  };
+  const usuariosRef = collection(db, "usuarios");
 
-  const addUser = async () => {
-    if (name.trim() && age.trim()) {
-      await addDoc(collection(db, "users"), {name, age: Number(age)});
-      setName("");
-      setAge("");
-      fetchUsers();
-    }}
-
-  const updateUser = async () => {
-    if (editingID && name.trim() && age.trim()){
-      await updateDoc(doc(db, "users", editingID), {name, age: Number(age)});
-      setEditingID(null);
-      setName("");
-      setAge("");
-      fetchUsers();
-    }
-  };
-
-  
-  const deleteUser = async (id) => {
-    await deleteDoc(doc(db, "users", id));
-    fetchUsers();
+  const obtenerUsuarios = async () => {
+    const data = await getDocs(usuariosRef);
+    setUsuarios(data.docs.map((doc) => ({ ...doc.data(), id: doc.id })));
   };
 
   useEffect(() => {
-    fetchUsers();
+    obtenerUsuarios();
   }, []);
 
-  const chartData = {
-    labels: users.map(user => user.name),
-    datasets: [
-      {
-        label: 'Edad',
-        data: users.map(user => user.age),
-        backgroundColor: 'rgba(75, 192, 192, 0.6)',
-        borderWidth: 1
-      }
-    ] 
+  const agregarUsuario = async () => {
+    if (nombre && edad) {
+      await addDoc(usuariosRef, { nombre, edad: Number(edad) });
+      setNombre("");
+      setEdad("");
+      obtenerUsuarios();
+    }
   };
 
-  return(
-    <div style={{textAlign: "center", marginTop: "50px"}}>
-      <h1>CRUD con Firebase y reportes</h1>
+  const actualizarUsuario = async (id) => {
+    const usuarioDoc = doc(db, "usuarios", id);
+    await updateDoc(usuarioDoc, { nombre, edad: Number(edad) });
+    setEditId(null);
+    setNombre("");
+    setEdad("");
+    obtenerUsuarios();
+  };
 
+  const eliminarUsuario = async (id) => {
+    const usuarioDoc = doc(db, "usuarios", id);
+    await deleteDoc(usuarioDoc);
+    obtenerUsuarios();
+  };
+
+  // Datos para Chart.js
+  const data = {
+    labels: usuarios.map((u) => u.nombre),
+    datasets: [
+      {
+        label: "Edad",
+        data: usuarios.map((u) => u.edad),
+        backgroundColor: "rgba(75,192,192,0.6)",
+      },
+    ],
+  };
+
+  return (
+    <div>
+      <h1>CRUD Usuarios</h1>
       <input
-        type='text'
-        value={name}
-        onchange={ (e) => setName(e.target.value)}
-        placeholder='Edad'
+        type="text"
+        placeholder="Nombre"
+        value={nombre}
+        onChange={(e) => setNombre(e.target.value)}
       />
-      {editingID ? (
-        <button onClick={updateUser}>Actualizar Usuario</button>
+      <input
+        type="number"
+        placeholder="Edad"
+        value={edad}
+        onChange={(e) => setEdad(e.target.value)}
+      />
+      {editId ? (
+        <button onClick={() => actualizarUsuario(editId)}>Actualizar</button>
       ) : (
-        <button onClick={addUser}>Agregar Usuario</button>
+        <button onClick={agregarUsuario}>Agregar</button>
       )}
-
       <ul>
-        {users.map(user => (
-          <li key={user.id}>
-            {user.name} - {user.age} años
-            <button onClick={() => {setName(user.name); setAge(user.age); setEditingID(user.id);}}>Editar</button>
-            <button onClick={() => deleteUser(user.id)}>Eliminar</button>
+        {usuarios.map((u) => (
+          <li key={u.id}>
+            {u.nombre} - {u.edad} años
+            <button
+              onClick={() => {
+                setEditId(u.id);
+                setNombre(u.nombre);
+                setEdad(u.edad);
+              }}
+            >
+              Editar
+            </button>
+            <button onClick={() => eliminarUsuario(u.id)}>Eliminar</button>
           </li>
         ))}
       </ul>
-
-        <h2>Reporte de Edades</h2>
-        <Bar data={chartData}/>
+      <h2>Reporte de Edades</h2>
+      <Bar data={data} />
     </div>
   );
 }
